@@ -1,2 +1,5 @@
 .env*
 node_modules
+hasil-validasi-*.csv
+hasil-validasi-*.json
+blacklist.json

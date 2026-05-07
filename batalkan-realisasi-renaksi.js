@@ -3,6 +3,7 @@ import path from "path";
 import Hashids from "hashids";
 import { chromium } from "playwright";
 import { login } from "./login.js";
+import blacklist from "./blacklist.json" with { type: "json" };
 
 const tahun = 2026;
 const maxTriwulan = 1;
@@ -61,45 +62,6 @@ const saveLogFile = () => {
   fs.writeFileSync(RESULT_LOG_PATH, JSON.stringify(validationResults, null, 2));
 
   log(`💾 Log berhasil disimpan: ${RESULT_LOG_PATH}`);
-};
-
-const saveCsvFile = () => {
-  const csvContent = [
-    [
-      "Timestamp",
-      "NRK",
-      "Nama",
-      "Jabatan",
-      "Unit Kerja",
-      "Renaksi",
-      "Target",
-      "Realisasi",
-      "Target Compact",
-      "Realisasi Compact",
-      "Realisasi Kurang dari Target",
-      "Realisasi Lebih dari Target",
-    ],
-    ...validationResults.map((result) => [
-      result.timestamp,
-      result.nrk,
-      result.nama,
-      result.jabatan,
-      result.unit_kerja,
-      result.renaksi,
-      result.target,
-      result.realisasi,
-      result.target_compact,
-      result.realisasi_compact,
-      result.realisasi_kurang_dari_target,
-      result.realisasi_lebih_dari_target,
-    ]),
-  ]
-    .map((row) => row.join(";"))
-    .join("\n");
-
-  fs.writeFileSync(RESULT_CSV_PATH, csvContent);
-
-  log(`💾 CSV berhasil disimpan: ${RESULT_CSV_PATH}`);
 };
 
 const waitAndClick = async (page, selector, options = {}) => {
@@ -223,20 +185,9 @@ const getPendingValidationData = async (page, tableId) => {
   return results;
 };
 
-const isValidTarget = ({ jabatanValue, lokasiValue, sudahRealisasiValue }) => {
-  return (
-    parseInt(sudahRealisasiValue) > 0 &&
-    (jabatanValue?.toUpperCase() === "KEPALA SUBBAGIAN TATA USAHA" ||
-      jabatanValue?.toUpperCase() ===
-        "KEPALA SATUAN PELAKSANA TATA USAHA SMP" ||
-      jabatanValue
-        ?.toUpperCase()
-        .includes("KEPALA SATUAN PELAKSANA PENDIDIKAN KECAMATAN") ||
-      lokasiValue
-        ?.toUpperCase()
-        .includes("SUKU DINAS PENDIDIKAN WILAYAH II KOTA ADM. JAKARTA PUSAT") ||
-      jabatanValue?.toUpperCase() === "STAF")
-  );
+const isValidTarget = ({ namaValue }) => {
+  const isBlacklisted = blacklist.some((item) => item.nama === namaValue);
+  return isBlacklisted;
 };
 
 const openEmployeeDetailPage = async (page, nrk) => {
@@ -256,106 +207,6 @@ const openEmployeeDetailPage = async (page, nrk) => {
   });
 
   log("✅ Halaman detail berhasil dibuka");
-};
-
-const fillValidationForm = async (page, idx, employeeData, renaksiData) => {
-  log("📝 Mengisi form validasi");
-
-  const targetValue = await page.evaluate(() => {
-    const els = document.querySelectorAll(".grid.grid-cols-3 > div");
-
-    return parseInt([...els][0]?.children?.[1]?.textContent || "0");
-  });
-
-  const realisasiValue = await page.evaluate(() => {
-    const els = document.querySelectorAll(".grid.grid-cols-3 > div");
-
-    return parseInt([...els][1]?.children?.[1]?.textContent || "0");
-  });
-
-  const targetCompactValue = await page.evaluate(() => {
-    const els = document.querySelectorAll(
-      ".target-output .grid.grid-cols-2 > div",
-    );
-
-    return parseInt([...els][0]?.children?.[1]?.textContent || "0");
-  });
-
-  const realisasiCompactValue = await page.evaluate(() => {
-    const els = document.querySelectorAll(
-      ".target-output .grid.grid-cols-2 > div",
-    );
-
-    return parseInt([...els][1]?.children?.[1]?.textContent || "0");
-  });
-
-  const isLessThanTarget =
-    realisasiValue < targetValue ||
-    (realisasiCompactValue || 0) < targetCompactValue;
-  const isGreaterThanTarget =
-    realisasiValue > targetValue ||
-    (realisasiCompactValue || 0) > targetCompactValue;
-
-  validationResults.push({
-    timestamp: new Date().toISOString(),
-    nrk: employeeData.nrkValue,
-    nama: employeeData.namaValue,
-    jabatan: employeeData.jabatanValue,
-    unit_kerja: employeeData.lokasiValue,
-    renaksi: renaksiData?.renaksi || "",
-    target: targetValue,
-    realisasi: realisasiValue,
-    target_compact: targetCompactValue,
-    realisasi_compact: realisasiCompactValue || 0,
-    realisasi_kurang_dari_target: isLessThanTarget,
-    realisasi_lebih_dari_target: isGreaterThanTarget,
-  });
-
-  saveLogFile();
-  saveCsvFile();
-
-  log(`📌 Target=${targetValue} | Realisasi=${realisasiValue}`);
-
-  log(`📌 Kurang target: ${isLessThanTarget ? "YA" : "TIDAK"}`);
-  log(`📌 Lebih target: ${isGreaterThanTarget ? "YA" : "TIDAK"}`);
-
-  const realisasi = realisasiValue
-    ? realisasiValue > targetValue
-      ? targetValue
-      : realisasiValue
-    : targetCompactValue;
-
-  const realisasiCompact = realisasiCompactValue
-    ? realisasiCompactValue > targetCompactValue
-      ? targetCompactValue
-      : realisasiCompactValue
-    : targetCompactValue;
-
-  await page.fill("#validasi", `${realisasi}`);
-
-  await page.fill("#nilai_kualitas", "100");
-
-  await page.fill(
-    "#keterangan",
-    "Output terealisasi sesuai dengan rencana aksi.",
-  );
-
-  const validasiIndikator = page.locator("#validasi-compact");
-
-  if (await validasiIndikator.count()) {
-    await page.fill("#validasi-compact", `${realisasiCompact}`);
-
-    await page.fill(
-      "#keterangan-compact",
-      "Output terealisasi sesuai dengan rencana aksi.",
-    );
-  }
-
-  await waitAndClick(page, 'button[type="submit"]:has-text("Simpan")');
-
-  await confirmSwal(page);
-
-  log(`✅ Output ke-${idx + 1} berhasil divalidasi`);
 };
 
 const processOutputValidation = async (page, employeeData, renaksiData) => {
@@ -382,10 +233,9 @@ const processOutputValidation = async (page, employeeData, renaksiData) => {
     for (let idx = 0; idx < cards.length; idx++) {
       try {
         const card = page.locator(cardSelector).nth(idx);
+        const renaksi = tempRenaksiData[idx]?.renaksi || "N/A";
 
-        const cardText = (await card.textContent())?.trim() || "";
-
-        if (!cardText.includes("Belum Validasi") && !isNeedValidateAll) {
+        if (!blacklist.some((item) => item.renaksi === renaksi)) {
           continue;
         }
 
@@ -394,21 +244,30 @@ const processOutputValidation = async (page, employeeData, renaksiData) => {
         console.log("\n----------------------------------------");
         log(`➡️ Memproses output ke-${idx + 1}`);
 
-        const pilihDataButton = card.locator('button:has-text("Pilih Data")');
+        log(`📌 Renaksi: ${renaksi}`);
 
-        if (!(await pilihDataButton.count())) {
+        const batalkanButton = card.locator(
+          'button:has-text("Batalkan Validasi")',
+        );
+
+        if (!(await batalkanButton.count())) {
+          log("⏭️ Tombol batalkan validasi tidak ditemukan, skip output ini");
           continue;
         }
 
-        await pilihDataButton.click();
+        await batalkanButton.click();
 
-        await delay(1000);
+        log("⚠️ Menunggu popup konfirmasi");
 
-        await fillValidationForm(page, idx, employeeData, tempRenaksiData[idx]);
+        await waitAndClick(page, 'button:has-text("Ya, saya sangat yakin")', {
+          timeout: 100000,
+        });
+
+        log("✅ Popup konfirmasi selesai");
 
         await delay(3000);
       } catch (err) {
-        log(`❌ Gagal validasi output ke-${idx + 1}`, err.message);
+        log(`❌ Gagal batalkan validasi output ke-${idx + 1}`, err.message);
       }
     }
 
