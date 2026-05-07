@@ -246,6 +246,12 @@ const fillValidationForm = async (page, idx, employeeData) => {
   const isLessThanTarget =
     realisasiValue < targetValue || realisasiCompactValue < targetCompactValue;
 
+  const realisasiCompact = realisasiCompactValue
+    ? realisasiCompactValue > targetCompactValue
+      ? targetCompactValue
+      : realisasiCompactValue
+    : targetCompactValue;
+
   validationResults.push({
     timestamp: new Date().toISOString(),
     nrk: employeeData.nrkValue,
@@ -255,7 +261,7 @@ const fillValidationForm = async (page, idx, employeeData) => {
     target: targetValue,
     realisasi: realisasiValue,
     target_compact: targetCompactValue,
-    realisasi_compact: realisasiCompactValue,
+    realisasi_compact: realisasiCompact,
     realisasi_kurang_dari_target: isLessThanTarget,
   });
 
@@ -277,10 +283,7 @@ const fillValidationForm = async (page, idx, employeeData) => {
   const validasiIndikator = page.locator("#validasi-compact");
 
   if (await validasiIndikator.count()) {
-    await page.fill(
-      "#validasi-compact",
-      `${realisasiCompactValue || realisasiValue || 0}`,
-    );
+    await page.fill("#validasi-compact", `${realisasiCompact}`);
 
     await page.fill(
       "#keterangan-compact",
