@@ -11,7 +11,7 @@ const bawahanLangsung = false;
 
 let triwulan = 1;
 
-const isNeedValidateAll = true;
+const isCancelAll = false;
 
 // ==============================
 // HASHID CONFIG
@@ -142,9 +142,9 @@ const getPendingValidationData = async (page, tableId) => {
     const row = page.locator(`table#${tableId} tbody tr`).nth(idx);
 
     const belumDivalidasiValue =
-      (await row.locator("td:nth-child(8)").textContent())?.trim() || "0";
+      (await row.locator("td:nth-child(7)").textContent())?.trim() || "0";
 
-    if (isNeedValidateAll || parseInt(belumDivalidasiValue) > 0) {
+    if (parseInt(belumDivalidasiValue) > 0) {
       const nrkValue =
         (await row.locator("td:nth-child(2)").textContent())?.trim() || "";
 
@@ -186,7 +186,7 @@ const getPendingValidationData = async (page, tableId) => {
 };
 
 const isValidTarget = ({ namaValue }) => {
-  const isBlacklisted = blacklist.some((item) => item.nama === namaValue);
+  const isBlacklisted = blacklist.some((item) => item.nama === namaValue)|| isCancelAll;
   return isBlacklisted;
 };
 
@@ -235,7 +235,7 @@ const processOutputValidation = async (page, employeeData, renaksiData) => {
         const card = page.locator(cardSelector).nth(idx);
         const renaksi = tempRenaksiData[idx]?.renaksi || "N/A";
 
-        if (!blacklist.some((item) => item.renaksi === renaksi)) {
+        if (!blacklist.some((item) => item.renaksi === renaksi) && !isCancelAll) {
           continue;
         }
 
