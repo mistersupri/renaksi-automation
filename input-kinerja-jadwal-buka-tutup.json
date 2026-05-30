@@ -1,0 +1,45 @@
+{
+  "data": [
+    {
+      "nama_jadwal": "Input Data Kinerja",
+      "tipe_jadwal": "tahunan",
+      "umum": [
+        {
+          "tahun_dibuka": "2026",
+          "tw_bulan_dibuka": null,
+          "tanggal_mulai": "2026-05-04 00:00:00",
+          "tanggal_akhir": "2026-05-10 00:00:00"
+        }
+      ],
+      "khusus": [
+        {
+          "tahun_dibuka": "2026",
+          "tw_bulan_dibuka": null,
+          "tanggal_mulai": "2026-05-04 00:00:00",
+          "tanggal_akhir": "2026-05-09 00:00:00",
+          "jenis_list": "nrk",
+          "list_khusus": ["181050", "179711"]
+        }
+      ]
+    },
+    {
+      "nama_jadwal": "Input Realisasi Kinerja",
+      "tipe_jadwal": "triwulan",
+      "umum": [
+        {
+          "tahun_dibuka": "2026",
+          "tw_bulan_dibuka": "1",
+          "tanggal_mulai": "2026-05-01 00:00:00",
+          "tanggal_akhir": "2026-05-10 00:00:00"
+        },
+        {
+          "tahun_dibuka": "2026",
+          "tw_bulan_dibuka": "1",
+          "tanggal_mulai": "2026-05-04 00:00:00",
+          "tanggal_akhir": "2026-05-10 00:00:00"
+        }
+      ],
+      "khusus": []
+    }
+  ]
+}

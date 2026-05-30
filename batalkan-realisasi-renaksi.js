@@ -11,7 +11,8 @@ const bawahanLangsung = false;
 
 let triwulan = 1;
 
-const isNeedValidateAll = true;
+const isNeedCancelAllUser = false;
+const isNeedCancelAllRenaksi = true;
 
 // ==============================
 // HASHID CONFIG
@@ -144,42 +145,38 @@ const getPendingValidationData = async (page, tableId) => {
     const belumDivalidasiValue =
       (await row.locator("td:nth-child(8)").textContent())?.trim() || "0";
 
-    if (isNeedValidateAll || parseInt(belumDivalidasiValue) > 0) {
-      const nrkValue =
-        (await row.locator("td:nth-child(2)").textContent())?.trim() || "";
+    const nrkValue =
+      (await row.locator("td:nth-child(2)").textContent())?.trim() || "";
 
-      const namaValue =
-        (await row.locator("td:nth-child(3)").textContent())?.trim() || "";
+    const namaValue =
+      (await row.locator("td:nth-child(3)").textContent())?.trim() || "";
 
-      const jabatanValue =
-        (
-          await row
-            .locator("td:nth-child(4) .jabatan div.fs-nano")
-            .textContent()
-        )?.trim() || "";
+    const jabatanValue =
+      (
+        await row.locator("td:nth-child(4) .jabatan div.fs-nano").textContent()
+      )?.trim() || "";
 
-      const lokasiValue =
-        (
-          await row.locator("td:nth-child(4) .lokasi div.fs-nano").textContent()
-        )?.trim() || "";
+    const lokasiValue =
+      (
+        await row.locator("td:nth-child(4) .lokasi div.fs-nano").textContent()
+      )?.trim() || "";
 
-      const sudahRealisasiValue =
-        (await row.locator("td:nth-child(6)").textContent())?.trim() || "0";
+    const sudahRealisasiValue =
+      (await row.locator("td:nth-child(6)").textContent())?.trim() || "0";
 
-      const sudahDivalidasiValue =
-        (await row.locator("td:nth-child(7)").textContent())?.trim() || "0";
+    const sudahDivalidasiValue =
+      (await row.locator("td:nth-child(7)").textContent())?.trim() || "0";
 
-      results.push({
-        idx,
-        nrkValue,
-        namaValue,
-        jabatanValue,
-        lokasiValue,
-        sudahRealisasiValue,
-        sudahDivalidasiValue,
-        belumDivalidasiValue,
-      });
-    }
+    results.push({
+      idx,
+      nrkValue,
+      namaValue,
+      jabatanValue,
+      lokasiValue,
+      sudahRealisasiValue,
+      sudahDivalidasiValue,
+      belumDivalidasiValue,
+    });
   }
 
   return results;
@@ -235,7 +232,10 @@ const processOutputValidation = async (page, employeeData, renaksiData) => {
         const card = page.locator(cardSelector).nth(idx);
         const renaksi = tempRenaksiData[idx]?.renaksi || "N/A";
 
-        if (!blacklist.some((item) => item.renaksi === renaksi)) {
+        if (
+          !blacklist.some((item) => item.renaksi === renaksi) &&
+          !isNeedCancelAllRenaksi
+        ) {
           continue;
         }
 
@@ -309,7 +309,7 @@ const processTableRows = async (page, pendingRows) => {
         `🔍 ${data.namaValue} | Realisasi=${data.sudahRealisasiValue} | Sudah=${data.sudahDivalidasiValue} | Belum=${data.belumDivalidasiValue}`,
       );
 
-      if (!isValidTarget(data)) {
+      if (!isValidTarget(data) && !isNeedCancelAllUser) {
         log("⏭️ Skip row");
 
         continue;
