@@ -4,12 +4,13 @@ import Hashids from "hashids";
 import { chromium } from "playwright";
 import { login } from "./login.js";
 
-const tahun = 2026;
-const maxTriwulan = 1;
+const tahun = 2025;
+const maxTriwulan = 4;
 const bawahanLangsung = false;
 
-let triwulan = 1;
+let triwulan = 4;
 
+const isNeedCancel = true;
 const isNeedValidateAll = true;
 
 // ==============================
@@ -358,6 +359,27 @@ const fillValidationForm = async (page, idx, employeeData, renaksiData) => {
   log(`✅ Output ke-${idx + 1} berhasil divalidasi`);
 };
 
+const batalkanValidasi = async (page, card) => {
+  log("📝 Membatalkan validasi");
+  const batalkanButton = card.locator('button:has-text("Batalkan Validasi")');
+
+  if (!(await batalkanButton.count())) {
+    log("⏭️ Tombol batalkan validasi tidak ditemukan, skip output ini");
+    return;
+  }
+
+  await batalkanButton.click();
+
+  log("⚠️ Menunggu popup konfirmasi");
+
+  await waitAndClick(page, 'button:has-text("Ya, saya sangat yakin")', {
+    timeout: 100000,
+  });
+
+  log("✅ Validasi berhasil dibatalkan");
+  await delay(3000);
+};
+
 const processOutputValidation = async (page, employeeData, renaksiData) => {
   const cardSelector = ".bg-white.rounded-2xl.border.border-slate-200";
 
@@ -385,8 +407,14 @@ const processOutputValidation = async (page, employeeData, renaksiData) => {
 
         const cardText = (await card.textContent())?.trim() || "";
 
-        if (!cardText.includes("Belum Validasi") && !isNeedValidateAll) {
-          continue;
+        if (isNeedValidateAll) {
+          if (!cardText.includes("Belum Validasi")) {
+            if (isNeedCancel) await batalkanValidasi(page, card);
+          }
+        } else {
+          if (!cardText.includes("Belum Validasi")) {
+            continue;
+          }
         }
 
         counter++;

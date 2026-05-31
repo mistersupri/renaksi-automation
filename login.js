@@ -23,7 +23,8 @@ export const login = async (page) => {
 
     // 1. GO TO LOGIN PAGE
     await page.goto("https://etpp.jakarta.go.id/login", {
-      waitUntil: "domcontentloaded",
+      waitUntil: "networkidle",
+      timeout: 100000,
     });
 
     log("✅ Halaman login berhasil dibuka");

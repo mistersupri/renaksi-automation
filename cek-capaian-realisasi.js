@@ -1,33 +1,18 @@
 import fs from "fs";
 import path from "path";
-import Hashids from "hashids";
 import { chromium } from "playwright";
 import { login } from "./login.js";
-import blacklist from "./blacklist.json" with { type: "json" };
+import { encodeParams } from "./encodeParams.js";
 
-const tahun = 2026;
-const maxTriwulan = 1;
-const bawahanLangsung = false;
+const tahun = 2025;
+const maxTriwulan = 4;
+const bawahanLangsung = true;
 
-let triwulan = 1;
-
-const isNeedCancelAllUser = false;
-const isNeedCancelAllRenaksi = true;
+let triwulan = 4;
 
 // ==============================
 // HASHID CONFIG
 // ==============================
-
-// isi sesuai window.settings.appname
-const APP_NAME = process.env.APP_NAME;
-
-const hashids = new Hashids(Buffer.from(APP_NAME).toString("base64"), 5);
-
-const encodeNRK = (nrk) => {
-  const hex = Buffer.from(String(nrk)).toString("hex");
-
-  return hashids.encodeHex(hex);
-};
 
 // ==============================
 // LOG FILE
@@ -65,6 +50,45 @@ const saveLogFile = () => {
   log(`💾 Log berhasil disimpan: ${RESULT_LOG_PATH}`);
 };
 
+const saveCsvFile = () => {
+  const csvContent = [
+    [
+      "Timestamp",
+      "NRK",
+      "Nama",
+      "Jabatan",
+      "Unit Kerja",
+      "Renaksi",
+      "Target",
+      "Realisasi",
+      "Target Compact",
+      "Realisasi Compact",
+      "Realisasi Kurang dari Target",
+      "Realisasi Lebih dari Target",
+    ],
+    ...validationResults.map((result) => [
+      result.timestamp,
+      result.nrk,
+      result.nama,
+      result.jabatan,
+      result.unit_kerja,
+      result.renaksi,
+      result.target,
+      result.realisasi,
+      result.target_compact,
+      result.realisasi_compact,
+      result.realisasi_kurang_dari_target,
+      result.realisasi_lebih_dari_target,
+    ]),
+  ]
+    .map((row) => row.join(";"))
+    .join("\n");
+
+  fs.writeFileSync(RESULT_CSV_PATH, csvContent);
+
+  log(`💾 CSV berhasil disimpan: ${RESULT_CSV_PATH}`);
+};
+
 const waitAndClick = async (page, selector, options = {}) => {
   const { timeout = 10000 } = options;
 
@@ -76,20 +100,6 @@ const waitAndClick = async (page, selector, options = {}) => {
   });
 
   await page.locator(selector).first().click();
-};
-
-const confirmSwal = async (page) => {
-  log("⚠️ Menunggu popup konfirmasi");
-
-  await waitAndClick(page, 'button:has-text("Ya, saya sangat yakin")', {
-    timeout: 100000,
-  });
-
-  await waitAndClick(page, '.swal2-modal button:has-text("OK")', {
-    timeout: 100000,
-  });
-
-  log("✅ Popup konfirmasi selesai");
 };
 
 const getTableId = () => {
@@ -127,7 +137,7 @@ const selectPeriode = async (page, triwulan) => {
 
   log("⏳ Menunggu data tampil");
 
-  await delay(5000);
+  await delay(10000);
 };
 
 const getPendingValidationData = async (page, tableId) => {
@@ -141,9 +151,6 @@ const getPendingValidationData = async (page, tableId) => {
 
   for (let idx = 0; idx < rows.length; idx++) {
     const row = page.locator(`table#${tableId} tbody tr`).nth(idx);
-
-    const belumDivalidasiValue =
-      (await row.locator("td:nth-child(7)").textContent())?.trim() || "0";
 
     const nrkValue =
       (await row.locator("td:nth-child(2)").textContent())?.trim() || "";
@@ -182,14 +189,24 @@ const getPendingValidationData = async (page, tableId) => {
   return results;
 };
 
-const isValidTarget = ({ namaValue }) => {
-  const isBlacklisted =
-    blacklist.some((item) => item.nama === namaValue) || isCancelAll;
-  return isBlacklisted;
+const isValidTarget = ({ jabatanValue, lokasiValue, sudahRealisasiValue }) => {
+  return (
+    parseInt(sudahRealisasiValue) > 0 &&
+    (jabatanValue?.toUpperCase() === "KEPALA SUBBAGIAN TATA USAHA" ||
+      jabatanValue?.toUpperCase() ===
+        "KEPALA SATUAN PELAKSANA TATA USAHA SMP" ||
+      jabatanValue
+        ?.toUpperCase()
+        .includes("KEPALA SATUAN PELAKSANA PENDIDIKAN KECAMATAN") ||
+      lokasiValue
+        ?.toUpperCase()
+        .includes("SUKU DINAS PENDIDIKAN WILAYAH II KOTA ADM. JAKARTA PUSAT") ||
+      jabatanValue?.toUpperCase() === "STAF")
+  );
 };
 
 const openEmployeeDetailPage = async (page, nrk) => {
-  const encodedId = encodeNRK(nrk);
+  const encodedId = encodeParams(String(nrk));
 
   const detailUrl = `https://etpp.jakarta.go.id/${encodedId}/lihat-validasi-realisasi-renaksi?tahun=${tahun}&triwulan=${triwulan}&shown=1`;
 
@@ -208,8 +225,6 @@ const openEmployeeDetailPage = async (page, nrk) => {
 };
 
 const processOutputValidation = async (page, employeeData, renaksiData) => {
-  const cardSelector = ".bg-white.rounded-2xl.border.border-slate-200";
-
   const totalData = await page.evaluate(() => {
     const el = document.querySelector(
       ".grid.grid-cols-2.md\\:grid-cols-4.gap-4.w-full.md\\:max-w-\\[480px\\] .text-2xl.mt-1.font-bold.text-slate-800.leading-none",
@@ -220,86 +235,23 @@ const processOutputValidation = async (page, employeeData, renaksiData) => {
 
   log(`📊 Total data keseluruhan: ${totalData}`);
 
-  let counter = 0;
-  let tempRenaksiData = renaksiData;
+  const listKualitasMutu = await page
+    .locator(
+      ".bg-white.rounded-2xl.border.border-slate-200.group span.text-sm.font-bold.text-blue-700:has-text('%')",
+    )
+    .allTextContents();
+  const listKetercapaianOutput = await page
+    .locator(
+      ".bg-white.rounded-2xl.border.border-slate-200.group div.text-xs.text-slate-500:has-text('Ketercapaian Output')",
+    )
+    .allTextContents();
 
-  while (true) {
-    const cards = await page.locator(cardSelector).all();
-
-    log(`📦 Total card halaman: ${cards.length}`);
-
-    for (let idx = 0; idx < cards.length; idx++) {
-      try {
-        const card = page.locator(cardSelector).nth(idx);
-        const renaksi = tempRenaksiData[idx]?.renaksi || "N/A";
-
-        if (
-          !blacklist.some((item) => item.renaksi === renaksi) &&
-          !isNeedCancelAllRenaksi
-        ) {
-          continue;
-        }
-
-        counter++;
-
-        console.log("\n----------------------------------------");
-        log(`➡️ Memproses output ke-${idx + 1}`);
-
-        log(`📌 Renaksi: ${renaksi}`);
-
-        const batalkanButton = card.locator(
-          'button:has-text("Batalkan Validasi")',
-        );
-
-        if (!(await batalkanButton.count())) {
-          log("⏭️ Tombol batalkan validasi tidak ditemukan, skip output ini");
-          continue;
-        }
-
-        await batalkanButton.click();
-
-        log("⚠️ Menunggu popup konfirmasi");
-
-        await waitAndClick(page, 'button:has-text("Ya, saya sangat yakin")', {
-          timeout: 100000,
-        });
-
-        log("✅ Popup konfirmasi selesai");
-
-        await delay(3000);
-      } catch (err) {
-        log(`❌ Gagal batalkan validasi output ke-${idx + 1}`, err.message);
-      }
-    }
-
-    if (counter >= totalData) {
-      break;
-    }
-
-    const nextButton = page.locator('.page-item:has-text("›")');
-
-    if (!(await nextButton.count())) {
-      break;
-    }
-
-    const response = page.waitForResponse((response) => {
-      return (
-        response.url().includes("/mankin/realisasi/") &&
-        response.url().includes("/cari-target-output") &&
-        response.request().method() === "GET"
-      );
-    });
-
-    await nextButton.first().click();
-
-    const json = await (await response).json();
-
-    tempRenaksiData = json?.data || [];
-
-    await delay(3000);
-  }
-
-  log("✅ Semua output selesai divalidasi");
+  log(
+    `📋 Kualitas mutu pada halaman ini: ${listKualitasMutu.map((text) => text.trim().replace("%", "")).join(", ")}`,
+  );
+  log(
+    `📋 Ketercapaian output pada halaman ini: ${listKetercapaianOutput.map((text) => text.trim().replace("Ketercapaian Output: ", "")).join(", ")}`,
+  );
 };
 
 const processTableRows = async (page, pendingRows) => {
@@ -310,7 +262,7 @@ const processTableRows = async (page, pendingRows) => {
         `🔍 ${data.namaValue} | Realisasi=${data.sudahRealisasiValue} | Sudah=${data.sudahDivalidasiValue} | Belum=${data.belumDivalidasiValue}`,
       );
 
-      if (!isValidTarget(data) && !isNeedCancelAllUser) {
+      if (!isValidTarget(data)) {
         log("⏭️ Skip row");
 
         continue;
