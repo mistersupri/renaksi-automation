@@ -4,8 +4,8 @@ import * as XLSX from "xlsx";
 import { chromium } from "playwright";
 import { login } from "./login.js";
 
-const tahun = 2025;
-const triwulan = 4;
+const tahun = 2026;
+const triwulan = 1;
 
 const SUMMARY_FILE = `evaluasi-kinerja-summary-${tahun}-TW${triwulan}.xlsx`;
 const DETAIL_FILE = `evaluasi-kinerja-detail-${tahun}-TW${triwulan}.xlsx`;

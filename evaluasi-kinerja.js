@@ -7,6 +7,35 @@ const triwulan = 1;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const log = (...args) => {
+  const time = new Date().toLocaleTimeString();
+
+  console.log(`[${time}]`, ...args);
+};
+
+const PERILAKU_FEEDBACK_MAP = {
+  "BERORIENTASI PELAYANAN":
+    "tanggap",
+
+  AKUNTABEL:
+    "tidak pernah menggunakan barang",
+
+  KOMPETEN:
+    "selalu mengupayakan yang terbaik",
+
+  HARMONIS:
+    "Tidak diskriminatif",
+
+  LOYAL:
+    "menindaklanjuti arahan pimpinan",
+
+  ADAPTIF:
+    "memberikan masukan",
+
+  KOLABORATIF:
+    "melibatkan tim kerja lain",
+};
+
 const ENDPOINTS = [
   {
     tipe: "Bawahan Langsung",
@@ -41,7 +70,7 @@ const waitAndClick = async (page, selector, timeout = 30000) => {
 const confirmSwal = async (page) => {
   await waitAndClick(page, '.swal2-modal button:has-text("Setuju")', 120000);
 
-  await waitAndClick(page, '.swal2-modal button:has-text("OK")', 120000);
+  await delay(2000);
 };
 
 (async () => {
@@ -112,7 +141,7 @@ const confirmSwal = async (page) => {
     (item) => item.status === "Draft",
   );
 
-  console.log(`Total Pegawai: ${employees.length}`);
+  log(`Total Pegawai: ${employees.length}`);
 
   // ====================================
   // PROCESS PEGAWAI
@@ -120,7 +149,7 @@ const confirmSwal = async (page) => {
 
   for (const employee of employees) {
     try {
-      console.log(`\n=== ${employee.v_nrk} - ${employee.v_nama} ===`);
+      log(`\n=== ${employee.v_nrk} - ${employee.v_nama} ===`);
 
       // ====================================
       // GET DATA EVALUASI
@@ -134,14 +163,14 @@ const confirmSwal = async (page) => {
       const evaluasi = evaluasiResponse.data?.data?.[0];
 
       if (!evaluasi) {
-        console.log("Data evaluasi tidak ditemukan");
+        log("Data evaluasi tidak ditemukan");
         continue;
       }
 
       const indikatorUtama = evaluasi.evaluasi_indikator_utama || [];
 
       if (!indikatorUtama.length) {
-        console.log("Tidak ada indikator utama");
+        log("Tidak ada indikator utama");
         continue;
       }
 
@@ -157,9 +186,11 @@ const confirmSwal = async (page) => {
 
       await delay(2000);
 
+      log(`📋 Memulai feedback indikator utama (${employee.v_nama})`);
+
       const rows = await page.locator("#utama tbody tr").count();
 
-      console.log(`Total indikator: ${rows}`);
+      log(`📊 Total indikator utama: ${rows}`);
 
       // ====================================
       // ITERASI INDIKATOR
@@ -175,33 +206,37 @@ const confirmSwal = async (page) => {
 
           const realisasi = indikator.f_realisasi || 100;
 
-          console.log(
-            `Indikator ${indikatorIndex + 1} | Realisasi=${realisasi}`,
+          log(
+            `🔍 Indikator ${indikatorIndex + 1}: Realisasi ${realisasi}%`,
           );
 
           // ====================================
           // GET FEEDBACK TEMPLATE
           // ====================================
 
-          const feedbackResponse = await axios.get(
-            `https://etpp.jakarta.go.id/evaluasi-kinerja/get-data-umpan-balik?realisasi=${realisasi}&jenis_penilaian=hasil_kerja`,
-            axiosConfig,
-          );
+          // const feedbackResponse = await axios.get(
+          //   `https://etpp.jakarta.go.id/evaluasi-kinerja/get-data-umpan-balik?realisasi=${realisasi}&jenis_penilaian=hasil_kerja`,
+          //   axiosConfig,
+          // );
 
-          const feedbackList = feedbackResponse.data || [];
+          // const feedbackList = feedbackResponse.data || [];
 
-          if (!feedbackList.length) {
-            console.log("Tidak ada template umpan balik");
-            continue;
-          }
+          // if (!feedbackList.length) {
+          //   log("Tidak ada template umpan balik");
+          //   continue;
+          // }
 
-          const randomFeedback =
-            feedbackList[Math.floor(Math.random() * feedbackList.length)]
-              ?.tx_umpan_balik;
+          // const randomFeedback =
+          //   feedbackList[Math.floor(Math.random() * 2)]
+          //     ?.tx_umpan_balik;
 
-          if (!randomFeedback) {
-            continue;
-          }
+          // log(
+          //   `💬 Feedback terpilih: ${randomFeedback || "Tidak ada"}`,
+          // );
+
+          // if (!randomFeedback) {
+          //   continue;
+          // }
 
           const row = page.locator("#utama tbody tr").nth(indikatorIndex);
 
@@ -216,18 +251,15 @@ const confirmSwal = async (page) => {
           await delay(1000);
 
           await page.evaluate(() => {
-            document
-              .querySelector("#form-umpan-balik #keterangan")
-              .removeAttribute("readonly");
+            document.querySelector("#form-umpan-balik .multiselect .multiselect__content-wrapper").style.display = "block";
+            [...document.querySelectorAll("#form-umpan-balik .multiselect__element span")].find((e) => e.textContent.includes("memenuhi ekspektasi dasar")).click();
           });
-
-          await page.fill("#form-umpan-balik #keterangan", randomFeedback);
 
           await page.click('#form-umpan-balik button:has-text("Simpan")');
 
           await confirmSwal(page);
 
-          console.log(`✓ Feedback indikator ${indikatorIndex + 1}`);
+          log(`✓ Feedback indikator ${indikatorIndex + 1}`);
 
           await delay(1000);
         } catch (err) {
@@ -242,73 +274,106 @@ const confirmSwal = async (page) => {
       const perilakuKerja = evaluasi.perilaku_kerja || [];
 
       if (perilakuKerja.length) {
-        console.log(`Total perilaku kerja: ${perilakuKerja.length}`);
+        log(`Total perilaku kerja: ${perilakuKerja.length}`);
 
-        const perilakuRows = await page.locator("#perilaku tbody tr").count();
+        log(
+          `📋 Memulai feedback perilaku kerja (${employee.v_nama})`,
+        );
 
-        for (
-          let perilakuIndex = 0;
-          perilakuIndex < Math.min(perilakuRows, perilakuKerja.length);
-          perilakuIndex++
-        ) {
+        const perilakuRows = await page
+          .locator("#perilaku-kerja tbody tr")
+          .count();
+
+        log(`📊 Total perilaku kerja: ${perilakuRows}`);
+
+        for (let idx = 0; idx < perilakuRows; idx++) {
           try {
-            const perilaku = perilakuKerja[perilakuIndex];
+            const row = page.locator("#perilaku-kerja tbody tr").nth(idx);
 
-            const feedbackList = perilaku.umpan_balik || [];
+            const perilakuName =
+              (
+                await row
+                  .locator('td[aria-colindex="2"]')
+                  .textContent()
+              )
+                ?.trim()
+                ?.toUpperCase() || "";
 
-            if (!feedbackList.length) {
-              console.log(
-                `Perilaku ${perilakuIndex + 1} tidak memiliki referensi feedback`,
-              );
+            const feedback =
+              PERILAKU_FEEDBACK_MAP[perilakuName];
 
-              continue;
-            }
-
-            const randomFeedback =
-              feedbackList[Math.floor(Math.random() * feedbackList.length)]
-                ?.tx_umpan_balik;
-
-            if (!randomFeedback) {
-              continue;
-            }
-
-            console.log(
-              `Perilaku ${perilakuIndex + 1}: ${perilaku.nama_kode_berakhlak}`,
+            log(
+              `🔍 Perilaku ${idx + 1}: ${perilakuName}`,
             );
 
-            const row = page.locator("#perilaku tbody tr").nth(perilakuIndex);
-
-            const editButton = row.locator('button[title="Ubah"]');
-
-            if (!(await editButton.count())) {
-              console.log(
-                `Tombol ubah tidak ditemukan pada perilaku ${perilakuIndex + 1}`,
+            if (!feedback) {
+              log(
+                `⚠️ Mapping tidak ditemukan untuk "${perilakuName}"`,
               );
 
               continue;
             }
+
+            log(
+              `💬 Feedback: ${feedback}`,
+            );
+
+            const editButton = row.locator(
+              'button[title="Ubah"]',
+            );
+
+            if (!(await editButton.count())) {
+              log(
+                `⚠️ Tombol ubah tidak ditemukan (${perilakuName})`,
+              );
+
+              continue;
+            }
+
+            log(
+              `🖱️ Klik ubah (${perilakuName})`,
+            );
 
             await editButton.click();
 
             await delay(1000);
 
-            await page.fill("#form-umpan-balik #keterangan", randomFeedback);
+            await page.evaluate((feedback) => {
+              document.querySelector("#form-umpan-balik .multiselect .multiselect__content-wrapper").style.display = "block";
+              [...document.querySelectorAll("#form-umpan-balik .multiselect__element span")].find((e) => e.textContent.includes(feedback)).click()
+            }, feedback);
 
-            await page.click('#form-umpan-balik button[type="submit"]');
+            log(
+              `✍️ Mengisi feedback (${perilakuName})`,
+            );
+
+            await page.click(
+              '#form-umpan-balik button:has-text("Simpan")',
+            );
+
+            log(
+              `💾 Menyimpan feedback (${perilakuName})`,
+            );
 
             await confirmSwal(page);
 
-            console.log(`✓ Feedback perilaku ${perilakuIndex + 1} berhasil`);
+            log(
+              `✅ Berhasil feedback perilaku: ${perilakuName}`,
+            );
 
             await delay(1000);
           } catch (err) {
-            console.error(`Perilaku ${perilakuIndex + 1}`, err.message);
+            log(
+              `❌ Gagal feedback perilaku row ${idx + 1}`,
+              err.message,
+            );
           }
         }
+
       }
 
       await page.click(
-        '.summary-box .summary-row.action-row button:has-text("Ubah"):nth-child(1)',
+        '.summary-box .summary-row.action-row button:nth-child(1)',
       );
 
       await page.selectOption(
@@ -335,7 +400,7 @@ const confirmSwal = async (page) => {
 
       await confirmSwal(page);
 
-      console.log(`Selesai ${employee.v_nrk} - ${employee.v_nama}`);
+      log(`Selesai ${employee.v_nrk} - ${employee.v_nama}`);
     } catch (err) {
       console.error(employee.v_nrk, employee.v_nama, err.message);
     }
