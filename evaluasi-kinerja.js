@@ -14,26 +14,19 @@ const log = (...args) => {
 };
 
 const PERILAKU_FEEDBACK_MAP = {
-  "BERORIENTASI PELAYANAN":
-    "tanggap",
+  "BERORIENTASI PELAYANAN": "mudah dipahami dan sabar",
 
-  AKUNTABEL:
-    "tidak pernah menggunakan barang",
+  AKUNTABEL: "mengakui kesalahan dan terbuka",
 
-  KOMPETEN:
-    "selalu mengupayakan yang terbaik",
+  KOMPETEN: "siap membantu",
 
-  HARMONIS:
-    "Tidak diskriminatif",
+  HARMONIS: "Tidak diskriminatif",
 
-  LOYAL:
-    "menindaklanjuti arahan pimpinan",
+  LOYAL: "mengikuti arahan pimpinan",
 
-  ADAPTIF:
-    "memberikan masukan",
+  ADAPTIF: "memberikan masukan",
 
-  KOLABORATIF:
-    "melibatkan tim kerja lain",
+  KOLABORATIF: "Tidak membedakan",
 };
 
 const ENDPOINTS = [
@@ -138,7 +131,7 @@ const confirmSwal = async (page) => {
   const tahunBulan = getTahunBulan(tahun, triwulan);
 
   const employees = [...uniqueNRK.values()].filter(
-    (item) => item.status === "Draft",
+    (item) => item.status === "Persetujuan pegawai",
   );
 
   log(`Total Pegawai: ${employees.length}`);
@@ -150,6 +143,11 @@ const confirmSwal = async (page) => {
   for (const employee of employees) {
     try {
       log(`\n=== ${employee.v_nrk} - ${employee.v_nama} ===`);
+
+      if (employee.najabl !== "STAF") {
+        log("Bukan staf, dilewati");
+        continue;
+      }
 
       // ====================================
       // GET DATA EVALUASI
@@ -206,9 +204,7 @@ const confirmSwal = async (page) => {
 
           const realisasi = indikator.f_realisasi || 100;
 
-          log(
-            `🔍 Indikator ${indikatorIndex + 1}: Realisasi ${realisasi}%`,
-          );
+          log(`🔍 Indikator ${indikatorIndex + 1}: Realisasi ${realisasi}%`);
 
           // ====================================
           // GET FEEDBACK TEMPLATE
@@ -240,6 +236,14 @@ const confirmSwal = async (page) => {
 
           const row = page.locator("#utama tbody tr").nth(indikatorIndex);
 
+          await page.evaluate(() => {
+            [
+              ...document.querySelectorAll(
+                "#utama tbody tr button[title='Ubah']",
+              ),
+            ].forEach((e) => (e.style.display = "block"));
+          });
+
           const editButton = row.locator('button[title="Ubah"]');
 
           if (!(await editButton.count())) {
@@ -251,10 +255,42 @@ const confirmSwal = async (page) => {
           await delay(1000);
 
           await page.evaluate(() => {
-            document.querySelector("#form-umpan-balik .multiselect .multiselect__content-wrapper").style.display = "block";
-            [...document.querySelectorAll("#form-umpan-balik .multiselect__element span")].find((e) => e.textContent.includes("memenuhi ekspektasi dasar")).click();
+            document.querySelector(
+              "#form-umpan-balik .multiselect .multiselect__content-wrapper",
+            ).style.display = "block";
           });
 
+          await delay(2000);
+
+          await page.evaluate(() => {
+            [
+              ...document.querySelectorAll(
+                "#form-umpan-balik .multiselect__element span",
+              ),
+            ]
+              .find((e) => e.textContent.includes("Pilih Umpan Balik"))
+              .click();
+          });
+
+          await delay(2000);
+
+          await page.evaluate(() => {
+            [
+              ...document.querySelectorAll(
+                "#form-umpan-balik .multiselect__element span",
+              ),
+            ]
+              .find((e) => e.textContent.includes("memenuhi ekspektasi dasar"))
+              .click();
+          });
+
+          await delay(2000);
+
+          await page.evaluate(() => {
+            document.querySelector(
+              "#form-umpan-balik .multiselect .multiselect__content-wrapper",
+            ).style.display = "none";
+          });
           await page.click('#form-umpan-balik button:has-text("Simpan")');
 
           await confirmSwal(page);
@@ -276,9 +312,7 @@ const confirmSwal = async (page) => {
       if (perilakuKerja.length) {
         log(`Total perilaku kerja: ${perilakuKerja.length}`);
 
-        log(
-          `📋 Memulai feedback perilaku kerja (${employee.v_nama})`,
-        );
+        log(`📋 Memulai feedback perilaku kerja (${employee.v_nama})`);
 
         const perilakuRows = await page
           .locator("#perilaku-kerja tbody tr")
@@ -291,90 +325,109 @@ const confirmSwal = async (page) => {
             const row = page.locator("#perilaku-kerja tbody tr").nth(idx);
 
             const perilakuName =
-              (
-                await row
-                  .locator('td[aria-colindex="2"]')
-                  .textContent()
-              )
+              (await row.locator('td[aria-colindex="2"]').textContent())
                 ?.trim()
                 ?.toUpperCase() || "";
 
-            const feedback =
-              PERILAKU_FEEDBACK_MAP[perilakuName];
+            const feedback = PERILAKU_FEEDBACK_MAP[perilakuName];
 
-            log(
-              `🔍 Perilaku ${idx + 1}: ${perilakuName}`,
-            );
+            log(`🔍 Perilaku ${idx + 1}: ${perilakuName}`);
 
             if (!feedback) {
-              log(
-                `⚠️ Mapping tidak ditemukan untuk "${perilakuName}"`,
-              );
+              log(`⚠️ Mapping tidak ditemukan untuk "${perilakuName}"`);
 
               continue;
             }
 
-            log(
-              `💬 Feedback: ${feedback}`,
-            );
+            log(`💬 Feedback: ${feedback}`);
 
-            const editButton = row.locator(
-              'button[title="Ubah"]',
-            );
+            await page.evaluate(() => {
+              [
+                ...document.querySelectorAll(
+                  "#perilaku-kerja tbody tr button[title='Ubah']",
+                ),
+              ].forEach((e) => (e.style.display = "block"));
+            });
+
+            const editButton = row.locator('button[title="Ubah"]');
 
             if (!(await editButton.count())) {
-              log(
-                `⚠️ Tombol ubah tidak ditemukan (${perilakuName})`,
-              );
+              log(`⚠️ Tombol ubah tidak ditemukan (${perilakuName})`);
 
               continue;
             }
 
-            log(
-              `🖱️ Klik ubah (${perilakuName})`,
-            );
+            log(`🖱️ Klik ubah (${perilakuName})`);
 
             await editButton.click();
 
             await delay(1000);
 
+            await page.evaluate(() => {
+              document.querySelector(
+                "#form-umpan-balik .multiselect .multiselect__content-wrapper",
+              ).style.display = "block";
+            });
+
+            await delay(2000);
+
+            await page.evaluate(() => {
+              [
+                ...document.querySelectorAll(
+                  "#form-umpan-balik .multiselect__element span",
+                ),
+              ]
+                .find((e) => e.textContent.includes("Pilih Umpan Balik"))
+                .click();
+            });
+
+            await delay(2000);
+
             await page.evaluate((feedback) => {
-              document.querySelector("#form-umpan-balik .multiselect .multiselect__content-wrapper").style.display = "block";
-              [...document.querySelectorAll("#form-umpan-balik .multiselect__element span")].find((e) => e.textContent.includes(feedback)).click()
+              [
+                ...document.querySelectorAll(
+                  "#form-umpan-balik .multiselect__element span",
+                ),
+              ]
+                .find((e) => e.textContent.includes(feedback))
+                .click();
             }, feedback);
 
-            log(
-              `✍️ Mengisi feedback (${perilakuName})`,
-            );
+            await delay(2000);
 
-            await page.click(
-              '#form-umpan-balik button:has-text("Simpan")',
-            );
+            await page.evaluate(() => {
+              document.querySelector(
+                "#form-umpan-balik .multiselect .multiselect__content-wrapper",
+              ).style.display = "none";
+            });
 
-            log(
-              `💾 Menyimpan feedback (${perilakuName})`,
-            );
+            log(`✍️ Mengisi feedback (${perilakuName})`);
+
+            await page.click('#form-umpan-balik button:has-text("Simpan")');
+
+            log(`💾 Menyimpan feedback (${perilakuName})`);
 
             await confirmSwal(page);
 
-            log(
-              `✅ Berhasil feedback perilaku: ${perilakuName}`,
-            );
+            log(`✅ Berhasil feedback perilaku: ${perilakuName}`);
 
             await delay(1000);
           } catch (err) {
-            log(
-              `❌ Gagal feedback perilaku row ${idx + 1}`,
-              err.message,
-            );
+            log(`❌ Gagal feedback perilaku row ${idx + 1}`, err.message);
           }
         }
-
       }
 
-      await page.click(
-        '.summary-box .summary-row.action-row button:nth-child(1)',
+      const rekomendasiButton = await page.locator(
+        ".summary-box .summary-row.action-row button:nth-child(1)",
       );
+
+      if (!(await rekomendasiButton.count())) {
+        log("⚠️ Tombol rekomendasi tidak ditemukan");
+        continue;
+      }
+
+      await rekomendasiButton.click();
 
       await page.selectOption(
         "#form-rekomendasi .custom-select.custom-select-sm",
@@ -387,9 +440,16 @@ const confirmSwal = async (page) => {
 
       await confirmSwal(page);
 
-      await page.click(
-        '.summary-box .summary-row.action-row button:has-text("Ubah"):nth-child(2)',
+      const catatanButton = await page.locator(
+        ".summary-box .summary-row.action-row button:nth-child(2)",
       );
+
+      if (!(await catatanButton.count())) {
+        log("⚠️ Tombol catatan tidak ditemukan");
+        continue;
+      }
+
+      await catatanButton.click();
 
       await page.fill(
         "[placeholder='Tuliskan catatan...']",
