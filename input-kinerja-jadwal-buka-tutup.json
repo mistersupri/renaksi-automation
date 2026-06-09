@@ -1,6 +1,19 @@
 {
   "data": [
     {
+      "nama_jadwal": "Validasi Realisasi Kinerja",
+      "tipe_jadwal": "triwulan",
+      "umum": [
+        {
+          "tahun_dibuka": "2026",
+          "tw_bulan_dibuka": 1,
+          "tanggal_mulai": "2026-06-04 00:00:00",
+          "tanggal_akhir": "2026-07-10 00:00:00"
+        }
+      ],
+      "khusus": []
+    },
+    {
       "nama_jadwal": "Input Data Kinerja",
       "tipe_jadwal": "tahunan",
       "umum": [
@@ -40,6 +53,29 @@
         }
       ],
       "khusus": []
+    },
+    {
+      "nama_jadwal": "Validasi Realisasi Kinerja",
+      "tipe_jadwal": "triwulan",
+      "umum": [],
+      "khusus": [
+        {
+          "tahun_dibuka": "2026",
+          "tw_bulan_dibuka": "1",
+          "tanggal_mulai": "2026-06-09 00:00:00",
+          "tanggal_akhir": "2026-06-10 00:00:00",
+          "jenis_list": "nrk",
+          "list_khusus": ["182602", "228754", "228755"]
+        },
+        {
+          "tahun_dibuka": "2026",
+          "tw_bulan_dibuka": "1",
+          "tanggal_mulai": "2026-06-09 00:00:00",
+          "tanggal_akhir": "2026-06-12 00:00:00",
+          "jenis_list": "nrk",
+          "list_khusus": ["228745", "228746", "228747", "228748"]
+        }
+      ]
     }
   ]
 }
