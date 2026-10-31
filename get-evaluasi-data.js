@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 import { login } from "./login.js";
 
 const tahun = 2026;
-const triwulan = 1;
+const triwulan = 3;
 
 const SUMMARY_FILE = `evaluasi-kinerja-summary-${tahun}-TW${triwulan}.xlsx`;
 const DETAIL_FILE = `evaluasi-kinerja-detail-${tahun}-TW${triwulan}.xlsx`;

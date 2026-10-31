@@ -4,14 +4,14 @@ import Hashids from "hashids";
 import { chromium } from "playwright";
 import { login } from "./login.js";
 
-const tahun = 2025;
-const maxTriwulan = 4;
-const bawahanLangsung = false;
+const tahun = 2026;
+const maxTriwulan = 3;
+const bawahanLangsung = true;
 
-let triwulan = 4;
+let triwulan = 3;
 
-const isNeedCancel = true;
-const isNeedValidateAll = true;
+const isNeedCancel = false;
+const isNeedValidateAll = false;
 
 // ==============================
 // HASHID CONFIG

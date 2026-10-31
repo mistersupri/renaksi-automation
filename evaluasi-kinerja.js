@@ -3,7 +3,17 @@ import { chromium } from "playwright";
 import { login } from "./login.js";
 
 const tahun = 2026;
-const triwulan = 1;
+const triwulan = 3;
+
+const STATUS = "Draft";
+
+const JABATAN_LIST = [
+  "STAF",
+  "KEPALA SUBBAGIAN TATA USAHA",
+  "KEPALA SATUAN PELAKSANA PENDIDIKAN KECAMATAN KEMAYORAN",
+  "KEPALA SATUAN PELAKSANA PENDIDIKAN KECAMATAN CEMPAKA PUTIH",
+  "KEPALA SATUAN PELAKSANA TATA USAHA SMP",
+];
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -26,13 +36,13 @@ const PERILAKU_FEEDBACK_MAP = {
 
   ADAPTIF: "memberikan masukan",
 
-  KOLABORATIF: "Tidak membedakan",
+  KOLABORATIF: "Tidak membedakan antara satu pegawai",
 };
 
 const ENDPOINTS = [
   {
     tipe: "Bawahan Langsung",
-    url: "https://etpp.jakarta.go.id/evaluasi-kinerja/search-get-evaluasi-bawahan-langsung",
+    url: "https://etpp.jakarta.go.id/evaluasi-kinerja/search-get-evaluasi-bawahan",
   },
   {
     tipe: "Bawahan Tidak Langsung",
@@ -131,7 +141,7 @@ const confirmSwal = async (page) => {
   const tahunBulan = getTahunBulan(tahun, triwulan);
 
   const employees = [...uniqueNRK.values()].filter(
-    (item) => item.status === "Persetujuan pegawai",
+    (item) => item.status === STATUS,
   );
 
   log(`Total Pegawai: ${employees.length}`);
@@ -144,8 +154,11 @@ const confirmSwal = async (page) => {
     try {
       log(`\n=== ${employee.v_nrk} - ${employee.v_nama} ===`);
 
-      if (employee.najabl !== "STAF") {
-        log("Bukan staf, dilewati");
+      const cocok = JABATAN_LIST.some((j) =>
+        employee.najabl?.toUpperCase().includes(j),
+      );
+      if (!cocok) {
+        log("Jabatan tidak termasuk daftar, dilewati");
         continue;
       }
 
@@ -182,11 +195,25 @@ const confirmSwal = async (page) => {
         waitUntil: "networkidle",
       });
 
+      const nilai_hasil_kerja = await page.evaluate(() => {
+        const element = document.querySelector(
+          "table.table-pengurang tfoot th[colspan='2'] b.ml-2.text-dark",
+        );
+        return element ? element.textContent : null;
+      });
+
+      if (nilai_hasil_kerja !== "100 %") {
+        log("Nilai hasil kerja kurang dari 100, dilewati");
+        continue;
+      }
+
       await delay(2000);
 
       log(`📋 Memulai feedback indikator utama (${employee.v_nama})`);
 
-      const rows = await page.locator("#utama tbody tr").count();
+      const rows = await page
+        .locator("#table-hasil-kerja-utama tbody tr")
+        .count();
 
       log(`📊 Total indikator utama: ${rows}`);
 
@@ -234,17 +261,19 @@ const confirmSwal = async (page) => {
           //   continue;
           // }
 
-          const row = page.locator("#utama tbody tr").nth(indikatorIndex);
+          const row = page
+            .locator("#table-hasil-kerja-utama tbody tr")
+            .nth(indikatorIndex);
 
           await page.evaluate(() => {
             [
               ...document.querySelectorAll(
-                "#utama tbody tr button[title='Ubah']",
+                "#table-hasil-kerja-utama tbody tr button[title='Ubah']",
               ),
             ].forEach((e) => (e.style.display = "block"));
           });
 
-          const editButton = row.locator('button[title="Ubah"]');
+          const editButton = row.locator('button[title="Ubah Umpan Balik"]');
 
           if (!(await editButton.count())) {
             continue;
@@ -315,19 +344,25 @@ const confirmSwal = async (page) => {
         log(`📋 Memulai feedback perilaku kerja (${employee.v_nama})`);
 
         const perilakuRows = await page
-          .locator("#perilaku-kerja tbody tr")
+          .locator("table.tbl-perilaku tbody tr")
           .count();
 
         log(`📊 Total perilaku kerja: ${perilakuRows}`);
 
         for (let idx = 0; idx < perilakuRows; idx++) {
           try {
-            const row = page.locator("#perilaku-kerja tbody tr").nth(idx);
+            const row = await page
+              .locator("table.tbl-perilaku tbody tr")
+              .nth(idx);
 
-            const perilakuName =
-              (await row.locator('td[aria-colindex="2"]').textContent())
-                ?.trim()
-                ?.toUpperCase() || "";
+            console.log(row);
+
+            const perilakuName = (
+              await row.locator(".nilai-perilaku").innerText({ timeout: 5000 })
+            )
+              .replace(/\s+/g, " ")
+              .trim()
+              .toUpperCase();
 
             const feedback = PERILAKU_FEEDBACK_MAP[perilakuName];
 
@@ -344,7 +379,7 @@ const confirmSwal = async (page) => {
             await page.evaluate(() => {
               [
                 ...document.querySelectorAll(
-                  "#perilaku-kerja tbody tr button[title='Ubah']",
+                  "table.tbl-perilaku tbody tr button[title='Ubah']",
                 ),
               ].forEach((e) => (e.style.display = "block"));
             });
@@ -365,7 +400,7 @@ const confirmSwal = async (page) => {
 
             await page.evaluate(() => {
               document.querySelector(
-                "#form-umpan-balik .multiselect .multiselect__content-wrapper",
+                "#modal-umpan-balik-perilaku .multiselect .multiselect__content-wrapper",
               ).style.display = "block";
             });
 
@@ -374,7 +409,7 @@ const confirmSwal = async (page) => {
             await page.evaluate(() => {
               [
                 ...document.querySelectorAll(
-                  "#form-umpan-balik .multiselect__element span",
+                  "#modal-umpan-balik-perilaku .multiselect__element span",
                 ),
               ]
                 .find((e) => e.textContent.includes("Pilih Umpan Balik"))
@@ -386,7 +421,7 @@ const confirmSwal = async (page) => {
             await page.evaluate((feedback) => {
               [
                 ...document.querySelectorAll(
-                  "#form-umpan-balik .multiselect__element span",
+                  "#modal-umpan-balik-perilaku .multiselect__element span",
                 ),
               ]
                 .find((e) => e.textContent.includes(feedback))
@@ -397,13 +432,15 @@ const confirmSwal = async (page) => {
 
             await page.evaluate(() => {
               document.querySelector(
-                "#form-umpan-balik .multiselect .multiselect__content-wrapper",
+                "#modal-umpan-balik-perilaku .multiselect .multiselect__content-wrapper",
               ).style.display = "none";
             });
 
             log(`✍️ Mengisi feedback (${perilakuName})`);
 
-            await page.click('#form-umpan-balik button:has-text("Simpan")');
+            await page.click(
+              '#modal-umpan-balik-perilaku button:has-text("Simpan")',
+            );
 
             log(`💾 Menyimpan feedback (${perilakuName})`);
 
@@ -419,7 +456,7 @@ const confirmSwal = async (page) => {
       }
 
       const rekomendasiButton = await page.locator(
-        ".summary-box .summary-row.action-row button:nth-child(1)",
+        ".rekomendasi-item button[title='Ubah']",
       );
 
       if (!(await rekomendasiButton.count())) {
@@ -429,19 +466,22 @@ const confirmSwal = async (page) => {
 
       await rekomendasiButton.click();
 
-      await page.selectOption(
-        "#form-rekomendasi .custom-select.custom-select-sm",
-        {
-          label: "Coaching",
-        },
-      );
+      await page.evaluate(() => {
+        [
+          ...document.querySelectorAll(
+            "#modal-rekomendasi .multiselect__element span",
+          ),
+        ]
+          .find((e) => e.textContent.includes("Coaching"))
+          .click();
+      });
 
       await page.click("button:has-text('Simpan')");
 
       await confirmSwal(page);
 
       const catatanButton = await page.locator(
-        ".summary-box .summary-row.action-row button:nth-child(2)",
+        ".catatan-item button[title='Ubah']",
       );
 
       if (!(await catatanButton.count())) {
@@ -457,6 +497,10 @@ const confirmSwal = async (page) => {
       );
 
       await page.click("button:has-text('Simpan')");
+
+      await confirmSwal(page);
+
+      await page.click("button:has-text('Kirim Hasil Evaluasi')");
 
       await confirmSwal(page);
 
